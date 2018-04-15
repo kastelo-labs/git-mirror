@@ -57,7 +57,7 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 
 		// Push all refs
 		if err := pushAllRefs("gitlab", gitlabToken, repo); err != nil {
-			log.Printf("%s: pushing: %v", name, err)
+			log.Printf("%s: pushing -> %s: %v", name, remoteURL, err)
 			continue
 		}
 
@@ -67,7 +67,8 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 
 		proj, _, err := gh.Projects.GetProject(gitlabGroup + "/" + src.GetName())
 		if err != nil && err != git.NoErrAlreadyUpToDate {
-			log.Println(" > Getting project:", err)
+			log.Printf("%s: getting project: %v", name, err)
+			continue
 		}
 
 		if proj.Description == "" {
@@ -76,7 +77,7 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 				Visibility:  gitlab.Visibility(gitlab.PublicVisibility),
 			})
 			if err != nil && err != git.NoErrAlreadyUpToDate {
-				log.Println(" > Setting project to public:", err)
+				log.Printf("%s: updating project: %v", name, err)
 			}
 		}
 	}
