@@ -31,7 +31,14 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 		log.Fatalf("Listing repositories for %s: %v", githubUser, err)
 	}
 
+	gh := gitlab.NewClient(nil, gitlabToken)
+	gh.SetBaseURL(gitlabURL + "/api/v4")
+
 	for _, src := range repos {
+		if src.GetFork() {
+			continue
+		}
+
 		name := src.GetFullName()
 
 		// Create a temporary repository location
@@ -62,11 +69,8 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 		}
 
 		// Check the project GitLab-side
-		gh := gitlab.NewClient(nil, gitlabToken)
-		gh.SetBaseURL(gitlabURL + "/api/v4")
-
 		proj, _, err := gh.Projects.GetProject(gitlabGroup + "/" + src.GetName())
-		if err != nil && err != git.NoErrAlreadyUpToDate {
+		if err != nil {
 			log.Printf("%s: getting project: %v", name, err)
 			continue
 		}
