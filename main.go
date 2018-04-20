@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/google/go-github/github"
+	"github.com/pkg/errors"
 	"github.com/xanzy/go-gitlab"
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
@@ -35,37 +37,13 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 	gh.SetBaseURL(gitlabURL + "/api/v4")
 
 	for _, src := range repos {
-		if src.GetFork() {
-			continue
-		}
-
 		name := src.GetFullName()
 
-		// Create a temporary repository location
-		path := filepath.Join(os.TempDir(), githubUser, src.GetName()) + ".git"
-		os.MkdirAll(filepath.Dir(path), 0700)
-
-		// Clone or fetch the original repo
-		var repo *git.Repository
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			url := src.GetGitURL()
-			repo, err = cloneRepo(url, path)
-		} else {
-			repo, err = fetchRepo(path)
-		}
-		if err != nil {
-			log.Printf("%s: fetching: %v", name, err)
-			continue
-		}
-
-		// Make sure we have a remote pointing at the destination
-		remoteURL := fmt.Sprintf("%s/%s/%s.git", gitlabURL, gitlabGroup, src.GetName())
-		ensureRemote("gitlab", remoteURL, repo)
-
-		// Push all refs
-		if err := pushAllRefs("gitlab", gitlabToken, repo); err != nil {
-			log.Printf("%s: pushing -> %s: %v", name, remoteURL, err)
-			continue
+		if !src.GetArchived() {
+			if err := pullPushRepo(githubUser, src.GetName(), src.GetGitURL(), gitlabURL, gitlabGroup, gitlabToken); err != nil {
+				log.Printf("%s: push/pull: %v", name, err)
+				continue
+			}
 		}
 
 		// Check the project GitLab-side
@@ -75,16 +53,50 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 			continue
 		}
 
-		if proj.Description == "" {
+		if !strings.HasPrefix(proj.Description, src.GetDescription()) {
 			_, _, err := gh.Projects.EditProject(proj.ID, &gitlab.EditProjectOptions{
-				Description: gitlab.String(fmt.Sprintf("Mirror of github.com/%s/%s", githubUser, src.GetName())),
+				Description: gitlab.String(fmt.Sprintf("%s (mirror of github.com/%s/%s)", src.GetDescription(), githubUser, src.GetName())),
 				Visibility:  gitlab.Visibility(gitlab.PublicVisibility),
 			})
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Printf("%s: updating project: %v", name, err)
 			}
 		}
+		if src.GetArchived() && !proj.Archived {
+			_, _, err := gh.Projects.ArchiveProject(proj.ID)
+			if err != nil && err != git.NoErrAlreadyUpToDate {
+				log.Printf("%s: archiving project: %v", name, err)
+			}
+		}
 	}
+}
+
+func pullPushRepo(githubUser, githubRepo, githubURL, gitlabURL, gitlabGroup, gitlabToken string) error {
+	// Create a temporary repository location
+	path := filepath.Join(os.TempDir(), githubUser, githubRepo) + ".git"
+	os.MkdirAll(filepath.Dir(path), 0700)
+
+	// Clone or fetch the original repo
+	var repo *git.Repository
+	var err error
+	if _, err = os.Stat(path); os.IsNotExist(err) {
+		repo, err = cloneRepo(githubURL, path)
+	} else {
+		repo, err = fetchRepo(path)
+	}
+	if err != nil {
+		return errors.Wrap(err, "fetching")
+	}
+
+	// Make sure we have a remote pointing at the destination
+	remoteURL := fmt.Sprintf("%s/%s/%s.git", gitlabURL, gitlabGroup, githubRepo)
+	ensureRemote("gitlab", remoteURL, repo)
+
+	// Push all refs
+	if err := pushAllRefs("gitlab", gitlabToken, repo); err != nil {
+		return errors.Wrap(err, "pushing")
+	}
+	return nil
 }
 
 func cloneRepo(url, path string) (*git.Repository, error) {
