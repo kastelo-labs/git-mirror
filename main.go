@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/google/go-github/github"
@@ -35,6 +36,7 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 
 	gh := gitlab.NewClient(nil, gitlabToken)
 	gh.SetBaseURL(gitlabURL + "/api/v4")
+	old := time.Now().Add(-2 * 365 * 24 * time.Hour)
 
 	for _, src := range repos {
 		name := src.GetFullName()
@@ -62,7 +64,9 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 				log.Printf("%s: updating project: %v", name, err)
 			}
 		}
-		if src.GetArchived() && !proj.Archived {
+
+		archived := src.GetArchived() || src.GetFork() && src.GetUpdatedAt().Before(old)
+		if archived && !proj.Archived {
 			_, _, err := gh.Projects.ArchiveProject(proj.ID)
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Printf("%s: archiving project: %v", name, err)
