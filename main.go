@@ -68,6 +68,14 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 			if err != nil && err != git.NoErrAlreadyUpToDate {
 				log.Printf("%s: updating project: %v", name, err)
 			}
+		} else if proj.Description == "" && src.GetDescription() == "" {
+			_, _, err := gh.Projects.EditProject(proj.ID, &gitlab.EditProjectOptions{
+				Description: gitlab.String(fmt.Sprintf("Mirror of github.com/%s/%s", githubUser, src.GetName())),
+				Visibility:  gitlab.Visibility(gitlab.PublicVisibility),
+			})
+			if err != nil && err != git.NoErrAlreadyUpToDate {
+				log.Printf("%s: updating project: %v", name, err)
+			}
 		}
 
 		archived := src.GetArchived() || src.GetFork() && src.GetUpdatedAt().Before(old)
