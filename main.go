@@ -41,17 +41,22 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 	for _, src := range repos {
 		name := src.GetFullName()
 
-		if !src.GetArchived() {
-			if err := pullPushRepo(githubUser, src.GetName(), src.GetGitURL(), gitlabURL, gitlabGroup, gitlabToken); err != nil {
-				log.Printf("%s: push/pull: %v", name, err)
-				continue
-			}
-		}
-
 		// Check the project GitLab-side
 		proj, _, err := gh.Projects.GetProject(gitlabGroup + "/" + src.GetName())
 		if err != nil {
 			log.Printf("%s: getting project: %v", name, err)
+			continue
+		}
+
+		err = pullPushRepo(githubUser, src.GetName(), src.GetGitURL(), gitlabURL, gitlabGroup, gitlabToken)
+		if err != nil && proj.Archived {
+			// Try to unarchive the project so we can push to it
+			gh.Projects.UnarchiveProject(proj.ID)
+			proj.Archived = false
+			err = pullPushRepo(githubUser, src.GetName(), src.GetGitURL(), gitlabURL, gitlabGroup, gitlabToken)
+		}
+		if err != nil {
+			log.Printf("%s: push/pull: %v", name, err)
 			continue
 		}
 
