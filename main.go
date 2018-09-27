@@ -40,6 +40,11 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 
 nextRepo:
 	for _, src := range repos {
+		if strings.Contains(src.GetDescription(), "[mirror]") {
+			// Don't mirror repos that are mirrors of something.
+			continue
+		}
+
 		name := src.GetFullName()
 
 		// Check the project GitLab-side
@@ -49,6 +54,8 @@ nextRepo:
 			continue
 		}
 
+		// Check if the project has protected branches. If it does, it's
+		// probably not a mirror destination.
 		branches, _, err := gh.Branches.ListBranches(proj.ID, nil)
 		for _, b := range branches {
 			if b.Protected {
