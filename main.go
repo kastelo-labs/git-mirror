@@ -38,6 +38,7 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 	gh.SetBaseURL(gitlabURL + "/api/v4")
 	old := time.Now().Add(-2 * 365 * 24 * time.Hour)
 
+nextRepo:
 	for _, src := range repos {
 		name := src.GetFullName()
 
@@ -46,6 +47,14 @@ func processMirror(gitlabURL string, gitlabToken, gitlabGroup, githubUser string
 		if err != nil {
 			log.Printf("%s: getting project: %v", name, err)
 			continue
+		}
+
+		branches, _, err := gh.Branches.ListBranches(proj.ID, nil)
+		for _, b := range branches {
+			if b.Protected {
+				log.Printf("%s: skipping project, it has protected branches (%s)", name, b.Name)
+				continue nextRepo
+			}
 		}
 
 		err = pullPushRepo(githubUser, src.GetName(), src.GetGitURL(), gitlabURL, gitlabGroup, gitlabToken)
