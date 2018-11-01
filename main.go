@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	srcURL := kingpin.Flag("src", "Source report URL").Short('s').Required().String()
-	dstURL := kingpin.Flag("dst", "Destination report URL").Short('d').Required().String()
+	srcURL := kingpin.Flag("src", "Source repo URL").Short('s').Required().String()
+	dstURL := kingpin.Flag("dst", "Destination repo URL").Short('d').Required().String()
 	srcToken := kingpin.Flag("src-token", "Source repo token/password").Short('t').String()
 	dstToken := kingpin.Flag("dst-token", "Destination repo token/password").Short('e').String()
 	srcUser := kingpin.Flag("src-user", "Source repo user").Short('u').String()
