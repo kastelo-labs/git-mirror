@@ -2,12 +2,12 @@ package main
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/config"
 	"gopkg.in/src-d/go-git.v4/plumbing/transport/http"
@@ -34,7 +34,9 @@ func pullPushRepo(srcURL, srcUser, srcToken, dstURL, dstUser, dstToken string, v
 	}
 
 	// Make sure we have a remote pointing at the destination
-	ensureRemote(repo, "dest", dstURL, verbose)
+	if err := ensureRemote(repo, "dest", dstURL, verbose); err != nil {
+		return err
+	}
 
 	// Push all refs
 	if err := pushAllRefs(repo, "dest", dstUser, dstToken, verbose); err != nil {
@@ -55,7 +57,10 @@ func cloneRepo(path, url, user, token string, verbose bool) (*git.Repository, er
 		}
 	}
 	repo, err := git.PlainClone(path, true, opts)
-	return repo, errors.Wrap(err, "git clone")
+	if err != nil {
+		return nil, fmt.Errorf("git clone: %w", err)
+	}
+	return repo, nil
 }
 
 func fetchRepo(path, user, token string, verbose bool) (*git.Repository, error) {
@@ -64,7 +69,7 @@ func fetchRepo(path, user, token string, verbose bool) (*git.Repository, error) 
 	}
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open repo: %w", err)
 	}
 	opts := &git.FetchOptions{
 		RemoteName: "origin",
@@ -80,13 +85,13 @@ func fetchRepo(path, user, token string, verbose bool) (*git.Repository, error) 
 		}
 	}
 	err = repo.Fetch(opts)
-	if err != git.NoErrAlreadyUpToDate && err != nil {
-		return nil, errors.Wrap(err, "git fetch")
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return nil, fmt.Errorf("git fetch: %w", err)
 	}
 	return repo, nil
 }
 
-func ensureRemote(repo *git.Repository, name, url string, verbose bool) {
+func ensureRemote(repo *git.Repository, name, url string, verbose bool) error {
 	remotes, _ := repo.Remotes()
 	exists := false
 	for _, remote := range remotes {
@@ -96,7 +101,9 @@ func ensureRemote(repo *git.Repository, name, url string, verbose bool) {
 				if verbose {
 					log.Printf("Remote %q has different URL, removing", name)
 				}
-				repo.DeleteRemote(name)
+				if err := repo.DeleteRemote(name); err != nil {
+					return fmt.Errorf("delete remote: %w", err)
+				}
 				break
 			}
 			exists = true
@@ -107,14 +114,18 @@ func ensureRemote(repo *git.Repository, name, url string, verbose bool) {
 		if verbose {
 			log.Printf("Adding remote %q for URL %s", name, url)
 		}
-		repo.CreateRemote(&config.RemoteConfig{
+		_, err := repo.CreateRemote(&config.RemoteConfig{
 			Name: name,
 			URLs: []string{url},
 			Fetch: []config.RefSpec{
 				config.RefSpec("+refs/heads/*:refs/remotes/" + name + "/*"),
 			},
 		})
+		if err != nil {
+			return fmt.Errorf("create remote: %w", err)
+		}
 	}
+	return nil
 }
 
 func pushAllRefs(repo *git.Repository, remote, user, token string, verbose bool) error {
@@ -135,8 +146,8 @@ func pushAllRefs(repo *git.Repository, remote, user, token string, verbose bool)
 		}
 	}
 	err := repo.Push(opts)
-	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return errors.Wrap(err, "git push")
+	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+		return fmt.Errorf("git push: %w", err)
 	}
 	return nil
 }
