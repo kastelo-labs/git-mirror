@@ -4,15 +4,15 @@ git-mirror
 Mirror a specific repository from one remote to another.
 
 ```
-usage: git-mirror --src=SRC --dst=DST [<flags>]
+Usage: git-mirror --src=STRING --dst=STRING
 
 Flags:
-      --help                 Show context-sensitive help (also try --help-long and --help-man).
-  -s, --src=SRC              Source repo URL
-  -d, --dst=DST              Destination repo URL
-  -t, --src-token=SRC-TOKEN  Source repo token/password
-  -e, --dst-token=DST-TOKEN  Destination repo token/password
-  -u, --src-user=SRC-USER    Source repo user
-  -v, --dst-user=DST-USER    Destination repo user
-      --verbose              Enable verbose output
+  -h, --help                Show context-sensitive help.
+  -s, --src=STRING          Source repo URL ($SRC_URL)
+  -d, --dst=STRING          Destination repo URL ($DST_URL)
+  -t, --src-token=STRING    Source repo token/password ($SRC_TOKEN)
+  -e, --dst-token=STRING    Destination repo token/password ($DST_TOKEN)
+  -u, --src-user=STRING     Source repo user ($SRC_USER)
+  -v, --dst-user=STRING     Destination repo user ($DST_USER)
+      --verbose             Enable verbose output ($VERBOSE)
 ```

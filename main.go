@@ -4,26 +4,30 @@ import (
 	"log"
 	"os"
 
-	"github.com/alecthomas/kingpin"
+	"github.com/alecthomas/kong"
 )
 
-func main() {
-	srcURL := kingpin.Flag("src", "Source repo URL").Short('s').Required().String()
-	dstURL := kingpin.Flag("dst", "Destination repo URL").Short('d').Required().String()
-	srcToken := kingpin.Flag("src-token", "Source repo token/password").Short('t').String()
-	dstToken := kingpin.Flag("dst-token", "Destination repo token/password").Short('e').String()
-	srcUser := kingpin.Flag("src-user", "Source repo user").Short('u').String()
-	dstUser := kingpin.Flag("dst-user", "Destination repo user").Short('v').String()
-	verbose := kingpin.Flag("verbose", "Enable verbose output").Bool()
-	kingpin.Parse()
+type CLI struct {
+	SrcURL   string `name:"src" short:"s" env:"SRC_URL" required:"true" help:"Source repo URL"`
+	DstURL   string `name:"dst" short:"d" env:"DST_URL" required:"true" help:"Destination repo URL"`
+	SrcToken string `name:"src-token" short:"t" env:"SRC_TOKEN" help:"Source repo token/password"`
+	DstToken string `name:"dst-token" short:"e" env:"DST_TOKEN" help:"Destination repo token/password"`
+	SrcUser  string `name:"src-user" short:"u" env:"SRC_USER" help:"Source repo user"`
+	DstUser  string `name:"dst-user" short:"v" env:"DST_USER" help:"Destination repo user"`
+	Verbose  bool   `name:"verbose" env:"VERBOSE" help:"Enable verbose output"`
+}
 
-	if *verbose {
+func main() {
+	var cli CLI
+	kong.Parse(&cli)
+
+	if cli.Verbose {
 		log.SetFlags(log.Lshortfile | log.Lmicroseconds)
 	} else {
 		log.SetFlags(0)
 	}
 
-	if err := pullPushRepo(*srcURL, *srcUser, *srcToken, *dstURL, *dstUser, *dstToken, *verbose); err != nil {
+	if err := pullPushRepo(cli.SrcURL, cli.SrcUser, cli.SrcToken, cli.DstURL, cli.DstUser, cli.DstToken, cli.Verbose); err != nil {
 		log.Println("Error:", err)
 		os.Exit(1)
 	}
