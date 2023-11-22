@@ -10,10 +10,11 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
-func pullPushRepo(srcURL, srcUser, srcToken, dstURL, dstUser, dstToken string, verbose bool) error {
+func pullPushRepo(srcURL, srcUser, srcToken, dstURL, dstUser, dstToken, headRef string, verbose bool) error {
 	// Create a temporary repository location
 	id := fmt.Sprintf("%x", sha256.Sum256([]byte(srcURL)))[:8]
 	path := filepath.Join(os.TempDir(), id) + ".git"
@@ -25,7 +26,7 @@ func pullPushRepo(srcURL, srcUser, srcToken, dstURL, dstUser, dstToken string, v
 	var repo *git.Repository
 	var err error
 	if _, err = os.Stat(path); os.IsNotExist(err) {
-		repo, err = cloneRepo(path, srcURL, srcUser, srcToken, verbose)
+		repo, err = cloneRepo(path, srcURL, srcUser, srcToken, headRef, verbose)
 	} else {
 		repo, err = fetchRepo(path, srcUser, srcToken, verbose)
 	}
@@ -45,11 +46,14 @@ func pullPushRepo(srcURL, srcUser, srcToken, dstURL, dstUser, dstToken string, v
 	return nil
 }
 
-func cloneRepo(path, url, user, token string, verbose bool) (*git.Repository, error) {
+func cloneRepo(path, url, user, token, headRef string, verbose bool) (*git.Repository, error) {
 	if verbose {
 		log.Println("Cloning", url, "...")
 	}
-	opts := &git.CloneOptions{URL: url}
+	opts := &git.CloneOptions{
+		URL:           url,
+		ReferenceName: plumbing.ReferenceName(headRef),
+	}
 	if user != "" || token != "" {
 		opts.Auth = &http.BasicAuth{
 			Username: user,
